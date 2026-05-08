@@ -6,6 +6,16 @@ from app.conversation.store import store
 
 router = APIRouter(prefix="/api/v1/conversation", tags=["对话"])
 
+# 单例：避免每次请求新建 TripAgent 实例
+_agent: TripAgent | None = None
+
+
+def get_agent() -> TripAgent:
+    global _agent
+    if _agent is None:
+        _agent = TripAgent()
+    return _agent
+
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest) -> ChatResponse:
@@ -16,7 +26,7 @@ async def chat(req: ChatRequest) -> ChatResponse:
     - 首次对话：不传conversation_id，自动创建新对话
     - 继续对话：传入conversation_id，Agent会读取历史状态
     """
-    agent = TripAgent()
+    agent = get_agent()
     result = await agent.chat(
         message=req.message,
         conversation_id=req.conversation_id,
