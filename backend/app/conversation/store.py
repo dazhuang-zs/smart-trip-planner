@@ -51,7 +51,7 @@ class ConversationStore:
             conn.commit()
 
     def create(self) -> dict:
-        cid = str(uuid.uuid4())[:8]
+        cid = uuid.uuid4().hex[:12]
         now = datetime.now().isoformat()
         with self._conn() as conn:
             conn.execute(
@@ -95,7 +95,7 @@ class ConversationStore:
         }
 
     def add_message(self, cid: str, role: str, content: str):
-        mid = str(uuid.uuid4())[:8]
+        mid = uuid.uuid4().hex[:12]
         now = datetime.now().isoformat()
         with self._conn() as conn:
             conn.execute(
