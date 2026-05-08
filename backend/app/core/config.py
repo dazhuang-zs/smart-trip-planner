@@ -8,8 +8,11 @@ class Settings(BaseSettings):
     """全局配置"""
 
     APP_NAME: str = "Smart Trip Planner"
-    APP_VERSION: str = "1.0.0"
+    APP_VERSION: str = "1.1.0"
     DEBUG: bool = False
+
+    # ── CORS 配置 ────────────────────────────────────────
+    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:8000"]
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 

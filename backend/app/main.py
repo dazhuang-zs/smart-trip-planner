@@ -9,22 +9,21 @@ from app.core.config import get_settings
 import logging
 
 settings = get_settings()
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG if settings.DEBUG else logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="智能行程规划助手 API",
     description="AI驱动的旅行规划工具，基于腾讯地图 + QClaw，支持多轮对话",
-    version="1.1.0",
+    version=settings.APP_VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
 )
 
-# CORS 中间件（修复安全配置）
-origins = getattr(settings, "CORS_ORIGINS", None)
+# CORS 中间件
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins if origins else ["http://localhost:3000", "http://localhost:8000"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -58,7 +57,7 @@ app.include_router(conversation_api.router)
 async def root():
     return {
         "name": "Smart Trip Planner",
-        "version": "1.1.0",
+        "version": settings.APP_VERSION,
         "docs": "/docs",
         "endpoints": {
             # 单轮模式
