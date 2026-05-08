@@ -61,10 +61,15 @@ class RouteOptimizer:
         n = len(pois)
         matrix = [[0.0] * n for _ in range(n)]
         poi_to_idx = {poi.id: i for i, poi in enumerate(pois)}
+        
+        # 批量获取距离矩阵（1次API调用 vs O(n²)次）
+        origins = [(poi.lat, poi.lng) for poi in pois]
+        matrix_results = await self.map_service.get_distance_matrix_batch(origins, origins, mode)
+        
         for i in range(n):
             for j in range(n):
                 if i != j:
-                    info = await self.map_service.get_distance(pois[i], pois[j], mode)
+                    info = matrix_results[i][j]
                     matrix[i][j] = info.distance_meters if info else float('inf')
         return matrix, poi_to_idx
 

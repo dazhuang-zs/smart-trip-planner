@@ -1,6 +1,6 @@
 """腾讯地图 POI 服务"""
 import httpx
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from app.models.poi import POI, TransportMode, DistanceInfo, DistanceMatrix
 from app.core.exceptions import POISearchError, APIRateLimitError
 from app.core.config import get_settings
@@ -144,6 +144,89 @@ class TencentMapService:
             return result
         except Exception:
             return None
+
+    async def get_distance_matrix_batch(
+        self,
+        origins: List[Tuple[float, float]],
+        destinations: List[Tuple[float, float]],
+        mode: TransportMode = TransportMode.DRIVING,
+    ) -> List[List[Optional[DistanceInfo]]]:
+        """批量计算多对多距离矩阵
+        
+        Args:
+            origins: [(lat, lng), ...] 起点坐标列表
+            destinations: [(lat, lng), ...] 终点坐标列表
+            mode: 交通方式
+            
+        Returns:
+            matrix[origin_idx][dest_idx] = DistanceInfo 或 None
+        """
+        if not origins or not destinations:
+            return []
+        
+        # 构建批量请求参数
+        from_coords = ";".join(f"{lat},{lng}" for lat, lng in origins)
+        to_coords = ";".join(f"{lat},{lng}" for lat, lng in destinations)
+        
+        url = f"{self.BASE_URL}/ws/distance/v1/matrix"
+        params = {
+            "key": self.api_key,
+            "from": from_coords,
+            "to": to_coords,
+            "mode": mode.value,
+        }
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(url, params=params, timeout=30.0)
+                data = resp.json()
+        except Exception:
+            # 降级为逐对调用
+            return await self._fallback_matrix(origins, destinations, mode)
+        
+        result_matrix: List[List[Optional[DistanceInfo]]] = []
+        rows = data.get("result", {}).get("rows", [])
+        
+        for origin_idx, row in enumerate(rows):
+            row_results: List[Optional[DistanceInfo]] = []
+            elements = row.get("elements", [])
+            for dest_idx, element in enumerate(elements):
+                if element.get("status") != 0:
+                    row_results.append(None)
+                    continue
+                    
+                dist = element.get("distance", {})
+                dur = element.get("duration", {})
+                from_lat, from_lng = origins[origin_idx]
+                to_lat, to_lng = destinations[dest_idx]
+                
+                info = DistanceInfo(
+                    from_poi=POI(id="", name="", lat=from_lat, lng=from_lng, address=""),
+                    to_poi=POI(id="", name="", lat=to_lat, lng=to_lng, address=""),
+                    mode=mode,
+                    distance_meters=dist.get("value", 0),
+                    duration_seconds=dur.get("value", 0),
+                )
+                row_results.append(info)
+            result_matrix.append(row_results)
+        
+        return result_matrix
+
+    async def _fallback_matrix(
+        self,
+        origins: List[Tuple[float, float]],
+        destinations: List[Tuple[float, float]],
+        mode: TransportMode,
+    ) -> List[List[Optional[DistanceInfo]]]:
+        """降级方案：逐对调用"""
+        result_matrix = []
+        for from_lat, from_lng in origins:
+            row = []
+            for to_lat, to_lng in destinations:
+                info = await self.get_distance_by_coords(from_lat, from_lng, to_lat, to_lng, mode)
+                row.append(info)
+            result_matrix.append(row)
+        return result_matrix
 
     async def geocode(self, address: str) -> dict:
         """地理编码：地址 → 坐标"""
