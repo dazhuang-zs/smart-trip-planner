@@ -12,8 +12,8 @@ settings = get_settings()
 class TencentMapService:
     """腾讯地图 API 客户端
 
-    注意：使用 httpx.AsyncClient 作为上下文管理器时，每次请求都会创建新连接。
-    对于高并发场景，建议使用依赖注入共享 client 实例。
+    httpx.AsyncClient 在实例生命周期内复用，避免每次请求新建连接。
+    通过 async with 上下文或手动 close() 关闭。
     """
 
     BASE_URL = "https://apis.map.qq.com"
@@ -25,6 +25,27 @@ class TencentMapService:
         self._poi_cache = get_poi_cache()
         self._distance_cache = get_distance_cache()
         self._geocode_cache = get_geocode_cache()
+        self._client: Optional[httpx.AsyncClient] = None
+
+    async def _get_client(self) -> httpx.AsyncClient:
+        """获取或创建复用的 httpx.AsyncClient"""
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(timeout=30.0)
+        return self._client
+
+    async def __aenter__(self):
+        await self._get_client()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        await self.close()
+
+    async def close(self):
+        """关闭客户端，释放连接"""
+        if self._client is not None and not self._client.is_closed:
+            await self._client.aclose()
+            self._client = None
+
 
     async def search_poi(
         self,
@@ -61,9 +82,9 @@ class TencentMapService:
             "orderby": "_distance",
         }
 
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(url, params=params, timeout=10.0)
-            data = resp.json()
+        client = await self._get_client()
+        resp = await client.get(url, params=params, timeout=10.0)
+        data = resp.json()
 
         if data.get("status") != 0:
             raise POISearchError(f"搜索失败: {data.get('message')}")
@@ -119,9 +140,9 @@ class TencentMapService:
         }
 
         try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.get(url, params=params, timeout=10.0)
-                data = resp.json()
+            client = await self._get_client()
+            resp = await client.get(url, params=params, timeout=10.0)
+            data = resp.json()
 
             rows = data.get("result", {}).get("rows", [{}])[0]
             elements = rows.get("elements", [{}])[0]
@@ -177,9 +198,9 @@ class TencentMapService:
         }
         
         try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.get(url, params=params, timeout=30.0)
-                data = resp.json()
+            client = await self._get_client()
+            resp = await client.get(url, params=params, timeout=30.0)
+            data = resp.json()
         except Exception:
             # 降级为逐对调用
             return await self._fallback_matrix(origins, destinations, mode)
@@ -238,9 +259,9 @@ class TencentMapService:
         url = f"{self.BASE_URL}/ws/geocoder/v1/"
         params = {"key": self.api_key, "address": address}
 
-        async with httpx.AsyncClient() as client:
-            resp = await client.get(url, params=params, timeout=10.0)
-            data = resp.json()
+        client = await self._get_client()
+        resp = await client.get(url, params=params, timeout=10.0)
+        data = resp.json()
 
         if data.get("status") != 0:
             raise POISearchError(f"地理编码失败: {data.get('message')}")
