@@ -71,10 +71,22 @@ class ConversationStore:
             return None
         return dict(row)
 
+    # 允许写入的字段白名单（防止注入）
+    _ALLOWED_FIELDS = frozenset({
+        "state", "city", "days", "attractions",
+        "hotel_area", "budget_per_night", "transport_mode",
+        "search_results", "route_plan", "confirmed_pois",
+        "last_message", "updated_at",
+    })
+
     def update(self, cid: str, **fields):
         fields["updated_at"] = datetime.now().isoformat()
-        sets = ", ".join(f"{k} = ?" for k in fields)
-        vals = list(fields.values()) + [cid]
+        # 只允许白名单中的字段写入（防止 SQL 列注入）
+        safe_fields = {k: v for k, v in fields.items() if k in self._ALLOWED_FIELDS}
+        if not safe_fields:
+            return
+        sets = ", ".join(f"{k} = ?" for k in safe_fields)
+        vals = list(safe_fields.values()) + [cid]
         with self._conn() as conn:
             conn.execute(f"UPDATE conversations SET {sets} WHERE id = ?", vals)
             conn.commit()
