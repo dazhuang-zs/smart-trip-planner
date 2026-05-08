@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     SILICONFLOW_BASE_URL: str = "https://api.siliconflow.cn/v1"
     SILICONFLOW_MODEL: str = "deepseek-ai/DeepSeek-V3"
 
+    # 小米Mimo（暂不支持，需要申请API Key）
+    # TODO: 支持小米Mimo模型接入
+    XIAOMI_MIMO_API_KEY: Optional[str] = None
+    XIAOMI_MIMO_BASE_URL: str = "https://api.xiaomimimo.com/v1"
+    XIAOMI_MIMO_MODEL: str = "MiMo-8B"
+
     # ── 缓存配置 ────────────────────────────────────────
     CACHE_ENABLED: bool = True
     CACHE_TTL_SECONDS: int = 86400
