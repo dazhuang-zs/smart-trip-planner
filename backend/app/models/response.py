@@ -1,6 +1,7 @@
 """通用响应模型"""
 from pydantic import BaseModel
 from typing import Optional, Any
+from app.core.config import __version__
 
 
 class APIResponse(BaseModel):
@@ -13,4 +14,4 @@ class APIResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str = "ok"
     service: str = "Smart Trip Planner"
-    version: str = "1.0.0"
+    version: str = __version__

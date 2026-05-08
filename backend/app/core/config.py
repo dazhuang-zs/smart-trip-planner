@@ -3,6 +3,8 @@ from pydantic_settings import BaseSettings
 from functools import lru_cache
 from typing import Optional
 
+__version__ = "1.1.0"
+
 
 class Settings(BaseSettings):
     """全局配置"""

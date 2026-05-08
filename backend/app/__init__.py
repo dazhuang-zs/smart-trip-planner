@@ -1,2 +1,3 @@
 """智能行程规划助手"""
-__version__ = "1.0.0"
+from app.core.config import __version__
+__version__ = __version__
